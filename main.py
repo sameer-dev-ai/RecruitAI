@@ -5,7 +5,6 @@ import traceback
 from pathlib import Path
 from typing import List, Optional
 
-from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,7 +14,11 @@ from openai import OpenAI
 
 import storage
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 app = FastAPI(title="Resume Screener API")
 router = APIRouter(prefix="/api")
