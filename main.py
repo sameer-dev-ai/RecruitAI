@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
@@ -232,8 +232,13 @@ def _screen_single_resume(job: dict, resume: dict, job_id: int, api_client: Open
         errors.append({"filename": resume["filename"], "error": str(e)})
 
 
+_INDEX_HTML = Path(__file__).parent / "public" / "index.html"
+
+
 @app.get("/")
 def root():
+    if _INDEX_HTML.exists():
+        return FileResponse(_INDEX_HTML, media_type="text/html")
     return {"status": "ok", "service": "recruitlens"}
 
 
