@@ -57,8 +57,8 @@ Or push to `main` if Git integration is connected.
 
 ```
 resume-screener/
-├── api/index.py          # Vercel serverless entrypoint
-├── main.py               # FastAPI routes (/api/*)
+├── main.py               # FastAPI app + /api/* routes (Vercel entrypoint)
+├── pyproject.toml        # Tells Vercel to use main:app
 ├── storage.py            # JSON + file storage (local or Blob)
 ├── blob_client.py        # Vercel Blob adapter
 ├── public/index.html     # Frontend (served from CDN)
