@@ -232,13 +232,19 @@ def _screen_single_resume(job: dict, resume: dict, job_id: int, api_client: Open
         errors.append({"filename": resume["filename"], "error": str(e)})
 
 
-_INDEX_HTML = Path(__file__).parent / "public" / "index.html"
+def _index_html_path() -> Optional[Path]:
+    base = Path(__file__).parent
+    for candidate in (base / "templates" / "index.html", base / "public" / "index.html"):
+        if candidate.exists():
+            return candidate
+    return None
 
 
 @app.get("/")
 def root():
-    if _INDEX_HTML.exists():
-        return FileResponse(_INDEX_HTML, media_type="text/html")
+    index = _index_html_path()
+    if index:
+        return FileResponse(index, media_type="text/html")
     return {"status": "ok", "service": "recruitlens"}
 
 
@@ -334,6 +340,6 @@ async def screen_job_resumes(
 
 app.include_router(router)
 
-_public = Path(__file__).parent / "public"
-if _public.exists() and not os.getenv("VERCEL"):
-    app.mount("/", StaticFiles(directory=str(_public), html=True), name="static")
+_static = Path(__file__).parent / "templates"
+if _static.exists() and not os.getenv("VERCEL"):
+    app.mount("/", StaticFiles(directory=str(_static), html=True), name="static")
