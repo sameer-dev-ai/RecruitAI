@@ -13,6 +13,8 @@ def blob_enabled() -> bool:
 
 
 def _headers() -> dict:
+    if not TOKEN:
+        raise RuntimeError("BLOB_READ_WRITE_TOKEN is not set")
     return {"Authorization": f"Bearer {TOKEN}"}
 
 

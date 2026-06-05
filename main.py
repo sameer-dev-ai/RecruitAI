@@ -1,17 +1,16 @@
 import json
 import os
 import tempfile
+import traceback
 from pathlib import Path
 from typing import List, Optional
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import pdfplumber
-import docx2txt
 from openai import OpenAI
 
 import storage
@@ -20,6 +19,14 @@ load_dotenv()
 
 app = FastAPI(title="Resume Screener API")
 router = APIRouter(prefix="/api")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    traceback.print_exc()
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,6 +58,8 @@ def _require_api_key() -> OpenAI:
 
 
 def extract_text_from_pdf(file_path: str) -> str:
+    import pdfplumber
+
     text = ""
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
@@ -61,6 +70,8 @@ def extract_text_from_pdf(file_path: str) -> str:
 
 
 def extract_text_from_docx(file_path: str) -> str:
+    import docx2txt
+
     return docx2txt.process(file_path)
 
 
@@ -84,7 +95,8 @@ def extract_resume_text_from_record(resume: dict) -> str:
     if ext == "txt":
         return content.decode("utf-8", errors="ignore").strip()
     suffix = "." + ext
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+    tmp_dir = "/tmp" if os.getenv("VERCEL") else None
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir=tmp_dir) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
     try:
@@ -217,9 +229,14 @@ def _screen_single_resume(job: dict, resume: dict, job_id: int, api_client: Open
         errors.append({"filename": resume["filename"], "error": str(e)})
 
 
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "recruitlens"}
+
+
 @router.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", **storage.storage_status()}
 
 
 @router.get("/jobs")

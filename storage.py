@@ -1,17 +1,13 @@
 import json
+import os
 import shutil
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from blob_client import blob_delete, blob_enabled, blob_get_bytes, blob_get_json, blob_list, blob_put_bytes, blob_put_json
 
-DATA_DIR = Path("data")
-JOBS_FILE = DATA_DIR / "jobs.json"
-UPLOAD_DIR = DATA_DIR / "uploads"
 BLOB_JOBS_PATH = "recruitlens/jobs.json"
-
 DEFAULT_STORE = {"next_job_id": 1, "next_resume_id": 1, "jobs": []}
 
 
@@ -19,18 +15,34 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _data_dir() -> Path:
+    if os.getenv("VERCEL"):
+        return Path("/tmp/recruitlens-data")
+    return Path("data")
+
+
+def _jobs_file() -> Path:
+    return _data_dir() / "jobs.json"
+
+
+def _upload_dir() -> Path:
+    return _data_dir() / "uploads"
+
+
 def _ensure_dirs() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    data_dir = _data_dir()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    _upload_dir().mkdir(parents=True, exist_ok=True)
 
 
 def _load() -> dict:
     if blob_enabled():
         return blob_get_json(BLOB_JOBS_PATH) or json.loads(json.dumps(DEFAULT_STORE))
     _ensure_dirs()
-    if not JOBS_FILE.exists():
+    jobs_file = _jobs_file()
+    if not jobs_file.exists():
         return json.loads(json.dumps(DEFAULT_STORE))
-    with open(JOBS_FILE, "r", encoding="utf-8") as f:
+    with open(jobs_file, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -39,8 +51,15 @@ def _save(store: dict) -> None:
         blob_put_json(BLOB_JOBS_PATH, store)
         return
     _ensure_dirs()
-    with open(JOBS_FILE, "w", encoding="utf-8") as f:
+    with open(_jobs_file(), "w", encoding="utf-8") as f:
         json.dump(store, f, indent=2, ensure_ascii=False)
+
+
+def storage_status() -> dict:
+    return {
+        "backend": "blob" if blob_enabled() else ("tmp" if os.getenv("VERCEL") else "local"),
+        "persistent": blob_enabled(),
+    }
 
 
 def _find_job(store: dict, job_id: int) -> Optional[dict]:
@@ -98,7 +117,7 @@ def _delete_job_files(job_id: int, resumes: list[dict]) -> None:
         for blob in blob_list(prefix):
             blob_delete(blob["pathname"])
         return
-    job_dir = UPLOAD_DIR / str(job_id)
+    job_dir = _upload_dir() / str(job_id)
     if job_dir.exists():
         shutil.rmtree(job_dir)
 
@@ -174,7 +193,7 @@ def delete_job(job_id: int) -> bool:
 
 
 def job_upload_dir(job_id: int) -> Path:
-    path = UPLOAD_DIR / str(job_id)
+    path = _upload_dir() / str(job_id)
     path.mkdir(parents=True, exist_ok=True)
     return path
 
